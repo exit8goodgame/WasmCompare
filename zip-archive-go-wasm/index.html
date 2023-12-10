@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Simple Files Zip Archiver</title>
+    <style type="text/css">
+h1 {
+  margin: 1em auto;
+  text-align:center;
+}
+div.main {
+  width: 100%;
+  height: calc(80vh - 5em);
+  margin: 1em auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+}
+div.field {
+  width: 100%;
+  text-align:center;
+}
+    </style>
+  </head>
+  <body>
+    <div class="main">
+      <h1>Simple Files Zip Archiver</h1>
+      <div class="field">
+        <label>Files</label>
+        <div class="ui input">
+          <input id="file" type="file" name="file" accept="*" onchange="ChangeFile();" multiple>
+        </div>
+      </div>
+      <div class="field">
+        <button id="archive" onclick="Archive();">Archive</button>
+      </div>
+    </div>
+    <script src="wasm_exec.js"></script>
+    <script>
+if (!WebAssembly.instantiateStreaming) { // polyfill
+	WebAssembly.instantiateStreaming = async (resp, importObject) => {
+		const source = await (await resp).arrayBuffer();
+		return await WebAssembly.instantiate(source, importObject);
+	};
+}
+
+const go = new Go();
+let mod, inst;
+WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject).then((result) => {
+	mod = result.module;
+	inst = result.instance;
+}).then(()=> {
+	console.clear();
+	go.run(inst);
+}).catch((err) => {
+	console.error(err);
+});
+
+var App = {data: [], length: 0};
+
+function toArrayBuffer(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsArrayBuffer(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+    });
+}
+
+function saveUint8Array(idx) {
+    return function(v) {
+        App.data[idx].value = new Uint8Array(v);
+    }
+}
+
+function ChangeFile() {
+    var fileElement = document.getElementById("file");
+    App.data = [];
+    App.length = fileElement.files.length;
+    for(let i = 0; i < fileElement.files.length; i++) {
+        const file = fileElement.files[i];
+        App.data[i] = {name: file.name, value: null};
+        toArrayBuffer(file).then(saveUint8Array(i));
+    }
+}
+
+function Archive() {
+    if (App.data.length > 0 &&
+        App.data.length == App.length) {
+        console.log(Date.now());
+        archive(App.data);
+    }
+}
+    </script>
+  </body>
+</html>
